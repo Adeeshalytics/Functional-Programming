@@ -1,37 +1,47 @@
-# EC8206 — Functional Programming Project
+# EC8206 — Functional Programming
+**Project Report**
+
 **Adeesha M.G.P | EG/2021/4385**
 
-## 1. Design, execution, and sample results
+## 1. Expression interpreter
 
-This project interprets arithmetic expression trees with variables, local bindings,
-and conditional expressions. `Expr.hs` contains the pure implementation; `Main.hs`
-demonstrates it; `Tests.hs` checks it; `comparison.py` is a runnable imperative
-counterpart. No external runtime packages are needed: GHC's `base` and Python's
-standard library suffice. From the submission folder, run `make test` and
-`make demo`. Without Make, run `runghc -iProject Project/Tests.hs` and
-`runghc -iProject Project/Main.hs`.
+The program evaluates arithmetic expressions containing numbers, variables,
+addition, subtraction, multiplication, and division. It also supports local
+bindings with `Let` and conditional expressions with `If`.
 
-The syntax separates arithmetic expressions from Boolean conditions:
+`Expr.hs` contains the evaluator and simplification functions. `Main.hs` runs
+sample expressions, while `Tests.hs` checks evaluation, simplification, and batch
+processing. `comparison.py` implements the same evaluation rules in Python.
 
-```haskell
-data Expr = Lit Double | Var String
-  | Add Expr Expr | Sub Expr Expr | Mul Expr Expr | Div Expr Expr
-  | Let String Expr Expr | If BExpr Expr Expr
-data BExpr = BLit Bool | Less Expr Expr | Equal Expr Expr
-  | And BExpr BExpr | Or BExpr BExpr | Not BExpr
-type Env = [(String, Double)]
-eval :: Env -> Expr -> Either String Double
+Run these commands from the extracted submission folder:
+
+```sh
+runghc -iProject Project/Main.hs
+runghc -iProject Project/Tests.hs
+python3 -B Project/comparison.py --parity
 ```
 
-The environment's first matching binding wins. A `Let` definition is evaluated
-in the outer environment; its body receives a new extended environment. Binary
-operands are evaluated left to right and the first error propagates. `If` selects
-one branch; `And` and `Or` short-circuit. Literals, environment values, and
-arithmetic results must be finite. NaN, infinity, and overflow return `Left`;
-ordinary floating-point rounding and underflow remain possible.
+The program uses the following types:
 
-The following expected and actual results are checked by `Main.hs`, with
-`x = 5, y = 2`. Values below abbreviate `Right`; errors abbreviate `Left`.
+```haskell
+ data Expr = Lit Double | Var String
+   | Add Expr Expr | Sub Expr Expr | Mul Expr Expr | Div Expr Expr
+   | Let String Expr Expr | If BExpr Expr Expr
+ data BExpr = BLit Bool | Less Expr Expr | Equal Expr Expr
+   | And BExpr BExpr | Or BExpr BExpr | Not BExpr
+ type Env = [(String, Double)]
+ eval :: Env -> Expr -> Either String Double
+```
+
+`Right` contains a successful result. `Left` contains an error message. Variable
+lookup uses the first matching name in the environment. A division checks the
+calculated denominator, so zero is detected even when it comes from a larger
+expression. NaN, infinity, and arithmetic overflow are also reported as errors.
+
+### Sample results
+
+The environment is `[("x", 5), ("y", 2)]`. Each result below is checked against
+its expected value in `Main.hs`.
 
 | Expression | Expected | Actual |
 |---|---|---|
@@ -46,184 +56,130 @@ The following expected and actual results are checked by `Main.hs`, with
 | if false && 1/0 < 2 then 1 else 9 | 9 | 9 |
 | let unused = 1/0 in 7 | Division by zero | Division by zero |
 
-Rows 6–7 distinguish shadowing from mutation. Rows 8–9 exercise skipped
-computation, while row 10 confirms that a binding definition is still evaluated
-even when the body does not use it. The complete captured run is in `Evidence/Demo.txt`.
+The shadowing example changes `x` only inside the binding. The next example
+shows that the outer `x` remains 5. The conditional examples show that a skipped
+branch is not evaluated. However, the definition of a `Let` is evaluated even
+when its body does not use that variable.
 
 <!-- pagebreak -->
 
-## 2. Higher-order processing and honest simplification
+## 2. Higher-order functions and simplification
 
-`evalAll env = map (eval env)` demonstrates partial application: supplying only
-the environment produces a function of type `Expr -> Either String Double`.
-`evalBatch` folds over those outcomes, retaining successful values in order.
-`successfulExpressions` evaluates each input once in its pipeline, then filters
-successful pairs and maps them back to expressions. `summarise` partitions
-outcomes into ordered values and messages; errors are retained rather than
-silently disappearing from the report.
-
-For the ten sample expressions, the report contains **7 successes and 3 failures**.
-Successful values are `[14, 2, 14, 12, 15, 7, 9]`; failures are division by zero,
-the undefined variable, and division by zero, in that order. Empty batches have
-zero counts and empty lists. These behaviors have assertions in the test suite.
-
-Rewriting uses the higher-order traversal
-`rewrite :: (Expr -> Expr) -> (BExpr -> BExpr) -> Expr -> Expr`. The traversal
-rebuilds children first, then applies a rule to their parent. Every syntax
-constructor has an explicit traversal case. Rule functions have a fallback
-because leaving a node unchanged is an intentional result.
-
-Two different simplification contracts are exposed:
-
-| Function | Contract |
-|---|---|
-| simplify | Algebraic demonstration: x+0, x*1, x*0, and additional identities. Discarded terms are assumed to succeed. |
-| simplifySafe | Conservative optimization: preserves evaluated terms unless successful evaluation independent of external bindings justifies discarding them. |
-
-For example, with no binding for `missing`:
-
-```text
-eval [] (Mul (Var "missing") (Lit 0))       = Left ...
-eval [] (simplify (Mul (Var "missing") (Lit 0))) = Right 0
-eval [] (simplifySafe (Mul (Var "missing") (Lit 0))) = Left ...
-```
-
-Multiplication's annihilator is a valid numerical identity, but strict evaluation
-can fail while computing the discarded operand. Thus the first simplifier meets
-the algebraic demonstration contract without claiming general error preservation.
-The safe pass does not rewrite an unknown variable multiplied by zero. It does
-fold `(2+3)*4` to 20, eliminate identities such as `x/1`, and simplify closed local
-bindings when their evaluation succeeds.
-
-Boolean rewrite order matters too: `false && error` may become false, whereas
-`error && false` must still fail. The tests include both directions. Constant
-branch elimination is safe when the original evaluator already skips that branch.
-
-The safe strategy is intentionally conservative. Re-evaluating closed subtrees
-can repeat work; a production optimizer would use a more efficient analysis.
-No text parser is implemented: examples construct typed trees directly. Floating
-point equivalence is numerical equality, including treating signed zeros as equal;
-there is no claim that printed representations or IEEE sign bits are preserved.
-
-<!-- pagebreak -->
-
-## 3. Comparison with the imperative implementation
-
-The included Python implementation uses tuple tags, explicit branching,
-exceptions, dictionary environments, and a loop that appends batch results.
-It has the same finite-number policy and evaluation order as Haskell. Its local
-binding deliberately implements correct scoping rather than illustrating a bug:
-
-```python
-if tag == "let":
-    value = evaluate(env, node[2])
-    local_env = env.copy()
-    local_env[node[1]] = value
-    return evaluate(local_env, node[3])
-```
-
-The corresponding Haskell case constructs an extended list without changing the
-original environment:
+Batch evaluation uses partial application:
 
 ```haskell
-eval env (Let name definition body) = do
-  value <- eval env definition
-  eval ((name, value):env) body
+ evalAll :: Env -> [Expr] -> [Either String Double]
+ evalAll env = map (eval env)
 ```
 
-| Aspect | Haskell implementation | Python implementation |
-|---|---|---|
-| Failure channel | Either String Double in the return type | EvaluationError raised internally, caught at the batch boundary |
-| Propagation | Either bind/applicative stops at the first Left | An exception unwinds recursive calls |
-| Local scope | Prepend a binding to an immutable list | Copy a dict, then assign a local binding |
-| Batch processing | map, filter, foldr, and partitionEithers | for loop and append to a mutable list |
-| Syntax checking | Constructors constrain child types and arity | Tuple tags and fields are checked during execution |
+After receiving `env`, `eval env` is a function waiting for an expression.
+`map` applies that function to every expression in the batch. `evalBatch` uses
+`foldr` to collect successful values, and `successfulExpressions` uses `filter`
+to select expressions that evaluate successfully. Their original order is kept.
 
-Haskell's return type prevents directly adding a numeric result to an unhandled
-`Either`. It does not force exhaustive handling in every conceivable caller:
-incomplete pattern matches remain possible, which is why warnings are promoted
-to errors. Similarly, Python exceptions are a legitimate propagation mechanism;
-the difference is their visibility in this implementation's interface, not that
-exceptions cannot be handled correctly.
+For the ten samples, batch processing gives seven successful values:
+`[14, 2, 14, 12, 15, 7, 9]`. The other three results are two division errors and
+one undefined-variable error. The summary retains those messages alongside the
+success and failure counts.
 
-`Add (Lit 1)` is a partially applied constructor function, not an `Expr` with
-a missing field. It is rejected when supplied where an expression is required.
-Separating `BExpr` from `Expr` also rejects `If (Lit 1) ...` as a numeric condition.
-These structural guarantees do not establish that the arithmetic or scoping
-implementation is correct. A wrong subtraction in the `Add` case can still type
-check; behavioral tests are necessary.
+### Simplification rules
 
-The Python version demonstrates that an imperative implementation can also
-preserve scope. Copying a dictionary has a cost proportional to the current
-environment size. Prepending a Haskell binding is constant time and safely shares
-the immutable tail, although lookup in that association list is linear. The
-comparison makes no benchmark claim and does not generalize these choices to all
-Python or Haskell programs.
+The tree is simplified from the children upward. For example, `(2 + 3) * 1`
+first becomes `5 * 1`, then becomes `5`. The `rewrite` function receives the
+arithmetic and Boolean rewrite functions as arguments, so the traversal can be
+reused with different rules.
 
-`python3 -B Project/comparison.py --parity` runs eight unittest methods, including
-16 sample subcases, then compares 16 actual Haskell and Python outcomes.
-All outcomes agree, including shadowing, errors, skipped branches, overflow,
-NaN, and infinity. An additional Python assertion checks that the input
-environment remains unchanged.
+`simplify` implements algebraic rules such as `x + 0 → x`, `x * 1 → x`,
+and `x * 0 → 0`. These rules need care when an expression can fail. For example,
+`missing * 0` produces an undefined-variable error, but replacing the whole
+expression with zero removes that error.
+
+The program therefore also provides `simplifySafe`. It folds expressions that
+can be evaluated successfully without external bindings and keeps terms that
+might fail. For an unbound variable:
+
+```haskell
+ let e = Mul (Var "missing") (Lit 0)
+ eval [] e                 -- Left "Undefined variable: missing"
+ eval [] (simplify e)      -- Right 0.0
+ eval [] (simplifySafe e)  -- Left "Undefined variable: missing"
+```
+
+The distinction is also important for Boolean expressions. `false && error`
+does not evaluate the right operand, but `error && false` still fails because
+the left operand is evaluated first. The safe simplifier keeps that behavior.
+
+### Testing
+
+The project compiled with GHC 9.6.6 using
+`-Wall -Wincomplete-patterns -Werror`. All 45 interpreter checks and ten sample
+checks passed. The tests cover operand order, missing variables, zero divisors,
+local scope, skipped branches, non-finite values, and ordered batch results.
+
+A further 500 generated trees were checked in three environments, giving 1,500
+comparisons between evaluation before and after safe simplification. Of these,
+912 evaluated to errors. The same trees were checked for repeated simplification
+producing the same tree and for simplification not increasing tree size.
+
+The Python tests passed, and the Haskell and Python implementations agreed on
+16 comparison cases. Temporary changes to the addition evaluator and safe
+simplifier caused test failures, confirming that the tests detect these mistakes.
 
 <!-- pagebreak -->
 
-## 4. Reflection, validation, and limitations
+## 3. Comparison with Python
 
-**Purity.** Evaluation, rewriting, and batch processing depend on explicit arguments
-and perform no I/O. Errors are return values; printing and process exits belong
-to entry points. Purity supports repeated evaluation and before/after comparisons,
-but does not imply that every rewrite preserves meaning.
+The Python evaluator uses tagged tuples and an `if`/`elif` sequence to select an
+operation. It raises `EvaluationError` for expected evaluation failures. The
+batch function catches those exceptions and appends each result to a list.
 
-**Immutability.** An extended environment shares the original immutable list as its
-tail; rewriting constructs nodes or shares existing subtrees. Both trees remain
-available for comparison. `(let x=10 in x)+x = 15`, with outer x=5, checks that
-a binding does not leak into its sibling expression.
+In Haskell, errors are represented by `Either String Double`. In a `do` block,
+a `Left` result stops the calculation and passes the error upward. In Python,
+an exception propagates through the recursive calls until it is caught. Both
+implementations handle errors, but Haskell shows the possibility of failure in
+the return type.
 
-**Type-driven modeling.** Constructors encode syntax shapes and separate arithmetic
-from Boolean expressions. Zero divisors, missing variables, and overflow still
-need runtime checks. Pattern coverage prevents omitted syntax cases, but does
-not prove termination, resource safety, or correct semantics.
+For local bindings, Python copies the environment dictionary before inserting
+the new value. This prevents the local binding from changing the caller's
+variables. Haskell creates an extended environment with `(name, value) : env`.
+The original list is unchanged, and its tail can be shared safely.
 
-### Executed validation
+The Haskell constructors restrict the number and types of operands. For example,
+`Add` needs two `Expr` values, and `If` needs a `BExpr` condition. An expression
+with a string operand or a numeric condition is rejected at compile time.
+Python's tuple representation does not provide those static checks. It detects
+unknown tags or invalid fields when the affected code runs.
 
-All Haskell entry points compiled under GHC 9.6.6 with
-`-Wall -Wincomplete-patterns -Werror`. The lab files have **27 checks each**;
-the interpreter test runner has **45 checks**; the demo validates **10 examples**.
-Every check passed. The generated corpus contains 500 bounded expression trees:
-preservation is checked in three environments (1,500 comparisons), and
-idempotence and non-growth are checked on all 500 trees. Of the 1,500 evaluated
-cases, **912 return errors**, so preservation testing is not limited to successes.
-These are finite checks, not a proof for every possible input.
+Pattern coverage warnings help find missing constructors, but they do not prove
+that an implementation calculates the correct answer. An `Add` case using
+subtraction would still compile, which is why numerical tests are needed.
 
-Four deliberate mutations were applied only to temporary copies: applying a
-function twice rather than thrice, using an incorrect grade threshold, subtracting
-in the addition evaluator, and substituting algebraic rewriting for the safe pass.
-All four caused failing checks and exit status 1. Logs are included in `Evidence/`.
-The Python suite and the 16-case cross-language comparison also passed.
+## 4. Functional programming principles
 
-### Scope and remaining review
+**Pure functions.** Evaluation and simplification use only their arguments and
+perform no input or output. The same expression and environment give the same
+result. This allows a test to compare a returned value directly with an expected
+result. Printing is handled separately in the entry-point files.
 
-The labs retain the common scaffold's signatures and sentinel conventions.
-`average [] = 0`, `myMaximum [] = minBound`, and `treeMax Leaf = minBound` are
-documented conventions; optional `Maybe` helpers express absence separately.
-Lab sums use bounded `Int` and do not detect overflow. Interpreter operations
-use finite `Double` values, with normal rounding and underflow. Testing covers
-bounded trees, not cyclic or infinite structures or exhausted machine resources.
+**Immutability.** A local binding creates a new environment rather than changing
+an existing one. Simplification also returns a tree without modifying the
+original. The original and simplified expressions can therefore be evaluated
+and compared independently.
 
-The original project brief was not supplied. Scope was inferred from the lecture
-decks and reference submissions; confirm the rubric, required signatures,
-report limit, and permitted assistance. `Let` and `If` demonstrate scope and
-short-circuit behavior.
+**Type safety.** The expression types prevent malformed tree structures, while
+`Either` separates errors from numbers. Runtime checks are still necessary for
+zero divisors, missing variables, and overflow. The types help organize those
+checks; they do not remove the need for them.
 
-### References and assistance
+**Limitations.** The program evaluates trees built in Haskell; it does not parse
+text input. `Double` arithmetic still has rounding and underflow. The algebraic
+simplifier can remove errors, so the safe version is used for preservation tests.
+The safe pass may repeat work while evaluating subtrees. The generated tests
+cover a bounded set of inputs rather than every possible expression.
 
-- EC8206 lecture decks: Higher-Order Functions and Pattern Matching, University of Ruhuna, supplied with this task.
-- G. Hutton, Programming in Haskell, 2nd edition, Cambridge University Press, 2016: defining functions, higher-order functions, and expression syntax.
+### References
+
+- EC8206 lecture notes: Higher-Order Functions and Pattern Matching, University of Ruhuna.
+- G. Hutton, Programming in Haskell, 2nd edition, Cambridge University Press, 2016.
 - GHC User's Guide, warning options: https://downloads.haskell.org/ghc/9.6.6/docs/users_guide/using-warnings.html
 - Python documentation, unittest: https://docs.python.org/3/library/unittest.html
-
-**AI assistance:** OpenAI Codex assisted in generating the source, tests, report,
-and supporting materials, and executed the documented cloud validation. Friends'
-submissions were inspected as reference material and are not included. The student
-should review and understand the work and follow the lecturer's assistance policy.
