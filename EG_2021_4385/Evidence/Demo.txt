@@ -1,0 +1,55 @@
+runghc -iProject Project/Main.hs
+Adeesha M.G.P | EG/2021/4385 | EC8206 interpreter
+Environment: [("x",5.0),("y",2.0)]
+
+arithmetic: (2.0 + (3.0 * 4.0))
+expected: Right 14.0
+actual:   Right 14.0
+
+variables: ((x - 1.0) / y)
+expected: Right 2.0
+actual:   Right 2.0
+
+zero divisor: (10.0 / (x - 5.0))
+expected: Left "Division by zero"
+actual:   Left "Division by zero"
+
+missing variable: (missing + 1.0)
+expected: Left "Undefined variable: missing"
+actual:   Left "Undefined variable: missing"
+
+local binding: (let a = 3.0 in ((a * a) + x))
+expected: Right 14.0
+actual:   Right 14.0
+
+shadowing: (let x = 10.0 in (x + y))
+expected: Right 12.0
+actual:   Right 12.0
+
+scope does not leak: ((let x = 10.0 in x) + x)
+expected: Right 15.0
+actual:   Right 15.0
+
+unselected branch: (if True then 7.0 else (1.0 / 0.0))
+expected: Right 7.0
+actual:   Right 7.0
+
+Boolean short circuit: (if (False && ((1.0 / 0.0) < 2.0)) then 1.0 else 9.0)
+expected: Right 9.0
+actual:   Right 9.0
+
+strict let definition: (let unused = (1.0 / 0.0) in 7.0)
+expected: Left "Division by zero"
+actual:   Left "Division by zero"
+
+Why the simplification modes differ:
+(missing * 0.0)
+Left "Undefined variable: missing"
+algebraic: 0.0
+Right 0.0
+safe: (missing * 0.0)
+Left "Undefined variable: missing"
+
+Batch report:
+BatchReport {successes = 7, failures = 3, resultValues = [14.0,2.0,14.0,12.0,15.0,7.0,9.0], errorMessages = ["Division by zero","Undefined variable: missing","Division by zero"]}
+Demo checks: 10/10 passed

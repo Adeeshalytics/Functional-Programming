@@ -1,0 +1,185 @@
+mkdir -p .build/hof .build/pm .build/project .build/demo .build/parity
+ghc -Wall -Wincomplete-patterns -Werror -outputdir .build/hof Assignments/HigherOrderFunctions.hs -o .build/hof/run
+./.build/hof/run
+PASS applyThrice
+PASS applyThrice on text
+PASS pipeline order
+PASS pipeline reverse order
+PASS empty pipeline
+PASS Fahrenheit
+PASS empty conversion
+PASS passing and boundary
+PASS empty passing
+PASS countIf
+PASS countIf no matches
+PASS countIf empty
+PASS maximum
+PASS negative maximum
+PASS empty maximum convention
+PASS maximumMaybe absence
+PASS maximumMaybe minBound
+PASS sum and count
+PASS sum and count empty
+PASS large sum and count
+PASS average
+PASS average empty convention
+PASS averageMaybe absence
+PASS VAT
+PASS startsWithA case and empty word
+PASS honour board order and boundary
+PASS empty honour board
+27/27 checks passed
+ghc -Wall -Wincomplete-patterns -Werror -outputdir .build/pm Assignments/PatternMatching.hs -o .build/pm/run
+./.build/pm/run
+PASS digit literals
+PASS digit wildcard
+PASS weekend
+PASS startsWithA contract
+PASS grade boundaries
+PASS quadrants
+PASS axes
+PASS second element
+PASS second singleton
+PASS second empty
+PASS same first two
+PASS different first two
+PASS sameFirstTwo singleton
+PASS sameFirstTwo empty
+PASS positive count
+PASS positive count empty
+PASS sample leaf count
+PASS empty tree leaf count
+PASS single node leaf count
+PASS sample maximum
+PASS negative tree maximum
+PASS empty tree maximum convention
+PASS empty tree maximumMaybe
+PASS minBound is a valid node
+PASS mirror traversal
+PASS mirror involution
+PASS leaf count invariant
+27/27 checks passed
+ghc -Wall -Wincomplete-patterns -Werror -iProject -outputdir .build/project Project/Tests.hs -o .build/project/run
+./.build/project/run
+PASS literal
+PASS variable
+PASS addition
+PASS subtraction order
+PASS multiplication
+PASS division order
+PASS nested zero divisor
+PASS missing variable
+PASS first error wins
+PASS let
+PASS let shadow
+PASS let no leak
+PASS definition sees outer scope
+PASS unused definition still evaluated
+PASS if true skips bad branch
+PASS if false skips bad branch
+PASS comparison
+PASS equality
+PASS and short circuit
+PASS or short circuit
+PASS not
+PASS reject infinity
+PASS reject NaN
+PASS reject non-finite binding
+PASS reject overflow
+PASS algebraic additive identity
+PASS algebraic multiplicative identity
+PASS required algebraic annihilator
+PASS constant folding
+PASS safe mode keeps missing-variable failure
+PASS safe mode keeps zero-divisor failure
+PASS safe mode keeps self-subtraction error
+PASS safe mode keeps error && false
+PASS safe mode keeps error || true
+PASS safe mode keeps unused let error
+PASS safe mode folds closed local binding
+PASS algebraic limitation explicitly demonstrated
+PASS ordered batch outcomes
+PASS ordered successful values
+PASS filter expressions
+PASS batch report
+PASS empty batch
+PASS safe preservation over generated corpus
+PASS safe idempotence over generated corpus
+PASS safe size never grows over generated corpus
+45/45 checks passed
+Generated corpus: 500 trees; 1500 environment/expression preservation checks
+Generated cases returning errors: 912
+ghc -Wall -Wincomplete-patterns -Werror -iProject -outputdir .build/demo Project/Main.hs -o .build/demo/run
+[2 of 3] Compiling Main             ( Project/Main.hs, .build/demo/Main.o ) [Source file changed]
+[3 of 3] Linking .build/demo/run [Objects changed]
+./.build/demo/run
+Adeesha M.G.P | EG/2021/4385 | EC8206 interpreter
+Environment: [("x",5.0),("y",2.0)]
+
+arithmetic: (2.0 + (3.0 * 4.0))
+expected: Right 14.0
+actual:   Right 14.0
+
+variables: ((x - 1.0) / y)
+expected: Right 2.0
+actual:   Right 2.0
+
+zero divisor: (10.0 / (x - 5.0))
+expected: Left "Division by zero"
+actual:   Left "Division by zero"
+
+missing variable: (missing + 1.0)
+expected: Left "Undefined variable: missing"
+actual:   Left "Undefined variable: missing"
+
+local binding: (let a = 3.0 in ((a * a) + x))
+expected: Right 14.0
+actual:   Right 14.0
+
+shadowing: (let x = 10.0 in (x + y))
+expected: Right 12.0
+actual:   Right 12.0
+
+scope does not leak: ((let x = 10.0 in x) + x)
+expected: Right 15.0
+actual:   Right 15.0
+
+unselected branch: (if True then 7.0 else (1.0 / 0.0))
+expected: Right 7.0
+actual:   Right 7.0
+
+Boolean short circuit: (if (False && ((1.0 / 0.0) < 2.0)) then 1.0 else 9.0)
+expected: Right 9.0
+actual:   Right 9.0
+
+strict let definition: (let unused = (1.0 / 0.0) in 7.0)
+expected: Left "Division by zero"
+actual:   Left "Division by zero"
+
+Why the simplification modes differ:
+(missing * 0.0)
+Left "Undefined variable: missing"
+algebraic: 0.0
+Right 0.0
+safe: (missing * 0.0)
+Left "Undefined variable: missing"
+
+Batch report:
+BatchReport {successes = 7, failures = 3, resultValues = [14.0,2.0,14.0,12.0,15.0,7.0,9.0], errorMessages = ["Division by zero","Undefined variable: missing","Division by zero"]}
+Demo checks: 10/10 passed
+ghc -Wall -Wincomplete-patterns -Werror -iProject -outputdir .build/parity Project/Parity.hs -o .build/parity/run
+python3 -B Project/comparison.py --parity
+test_batch_keeps_errors_and_order (__main__.InterpreterTests.test_batch_keeps_errors_and_order) ... ok
+test_boolean_errors_and_not (__main__.InterpreterTests.test_boolean_errors_and_not) ... ok
+test_definition_reads_outer_scope (__main__.InterpreterTests.test_definition_reads_outer_scope) ... ok
+test_empty_batch (__main__.InterpreterTests.test_empty_batch) ... ok
+test_nonfinite_binding (__main__.InterpreterTests.test_nonfinite_binding) ... ok
+test_sample_outcomes (__main__.InterpreterTests.test_sample_outcomes) ... ok
+test_scope_is_not_mutated (__main__.InterpreterTests.test_scope_is_not_mutated) ... ok
+test_unknown_tag_is_rejected (__main__.InterpreterTests.test_unknown_tag_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.000s
+
+OK
+Cross-language parity: 16/16 outcomes agree

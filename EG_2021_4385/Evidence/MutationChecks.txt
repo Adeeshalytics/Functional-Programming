@@ -1,0 +1,4 @@
+hof-thrice: rejected with exit 1; first failing check: FAIL applyThrice
+pm-grade: rejected with exit 1; first failing check: FAIL grade boundaries
+project-add: rejected with exit 1; first failing check: FAIL addition
+project-unsafe: rejected with exit 1; first failing check: FAIL safe mode keeps missing-variable failure
